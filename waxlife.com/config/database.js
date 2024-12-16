@@ -1,21 +1,26 @@
-const { Sequelize } = require('sequelize');
+const mongoose = require('mongoose');
 
-const sequelize = new Sequelize('waxlife', 'root', '', {
-  host: 'localhost',
-  dialect: 'mysql',
+// MongoDB connection string (replace with your actual database and credentials)
+const MONGO_URI = 'mongodb://localhost:27017/waxlife';
+
+// Connect to MongoDB
+mongoose
+  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB connected...'))
+  .catch((err) => console.error('Unable to connect to MongoDB:', err));
+
+// Handle database events
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connected to the database...');
 });
 
-sequelize
-  .authenticate()
-  .then(() => console.log('Database connected...'))
-  .catch((err) => console.error('Unable to connect to the database:', err));
+mongoose.connection.on('error', (err) => {
+  console.error('Mongoose connection error:', err);
+});
 
-// Sync the database without dropping tables or data
-sequelize
-  .sync({ alter: true }) // Adjusts tables as necessary without truncating
-  .then(() => console.log('Database synced...'))
-  .catch((err) => console.error('Error syncing the database:', err));
+mongoose.connection.on('disconnected', () => {
+  console.log('Mongoose disconnected...');
+});
 
-module.exports = sequelize;
-
-
+// Export the Mongoose connection
+module.exports = mongoose;

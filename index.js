@@ -1,13 +1,19 @@
-const sequelize = require('./waxlife.com/config/database');
+const mongoose = require('./waxlife.com/config/database');
 const express = require('express'); // Add this line
 const bodyParser = require('body-parser'); // Add this line
 const userRoutes = require('./waxlife.com/routes/userRoutes')
 const authRoutes = require('./waxlife.com/routes/authRouter')
 const { setupCors } = require('./waxlife.com/config/Security');
 
-sequelize.sync({ alter: true }).then(() => {
-  console.log('Database & tables created!');
+// MongoDB connection check (assuming it's already handled in the config)
+mongoose.connection.on('connected', () => {
+  console.log('Connected to MongoDB');
 });
+
+mongoose.connection.on('error', (err) => {
+  console.error('Failed to connect to MongoDB:', err);
+});
+
 
 
 const app = express();

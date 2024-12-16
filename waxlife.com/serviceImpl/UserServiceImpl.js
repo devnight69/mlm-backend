@@ -1,22 +1,24 @@
 const User = require("../models/User");
 const UserService = require("../service/UserService");
 const BaseResponse = require("../response/baseResponse");
-const sequelize = require("../config/database");
 const { StatusCodes } = require("http-status-codes");
 const JwtTokenUtil = require("../utils/JwtTokenUtil");
 const TokenPayloadDto = require("../dto/request/tokenPayloadRequestDto");
+const mongoose = require("mongoose");
 
 class UserServiceImpl extends UserService {
   async createUser(userDto) {
-    const transaction = await sequelize.transaction(); // Start a transaction
+    // Start a session for MongoDB transactions
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       // Check if a user with the same mobile number already exists
-      const existingUser = await User.findOne(
-        { where: { mobileNumber: userDto.mobileNumber } },
-        { transaction }
-      );
+      const existingUser = await User.findOne({ mobileNumber: userDto.mobileNumber }, null, { session });
+
       if (existingUser) {
-        await transaction.rollback(); // Rollback transaction if user exists
+        await session.abortTransaction(); // Abort the transaction if user exists
+        session.endSession();
         return BaseResponse.errorResponseWithData(
           StatusCodes.BAD_REQUEST,
           "User with this mobile number already exists."
@@ -24,7 +26,8 @@ class UserServiceImpl extends UserService {
       }
 
       // Create the new user
-      const newUser = await User.create(userDto, { transaction });
+      const newUser = new User(userDto);
+      await newUser.save({ session });
 
       // Convert TokenPayloadDto instance to a plain object
       const tokenPayload = new TokenPayloadDto(newUser);
@@ -39,7 +42,8 @@ class UserServiceImpl extends UserService {
         token,
       };
 
-      await transaction.commit(); // Commit the transaction if all operations succeed
+      await session.commitTransaction(); // Commit the transaction if all operations succeed
+      session.endSession();
 
       // Return a success response
       return BaseResponse.successResponseWithMessage(
@@ -47,26 +51,30 @@ class UserServiceImpl extends UserService {
         responseData
       );
     } catch (error) {
-      await transaction.rollback(); // Rollback transaction in case of any error
+      await session.abortTransaction(); // Rollback transaction in case of any error
+      session.endSession();
       return BaseResponse.errorResponse(error);
     }
   }
 
   async getAllUsers() {
-    return await User.findAll();
+    return await User.find(); // Fetch all users
   }
 
   async getUserById(userId) {
-    return await User.findByPk(userId);
+    return await User.findById(userId); // Fetch user by MongoDB _id
   }
 
   async updateUser(userId, userDto) {
-    const [updatedRows] = await User.update(userDto, { where: { id: userId } });
-    return updatedRows;
+    // Use MongoDB's findByIdAndUpdate method
+    const updatedUser = await User.findByIdAndUpdate(userId, userDto, { new: true }); // `new: true` returns the updated document
+    return updatedUser;
   }
 
   async deleteUser(userId) {
-    return await User.destroy({ where: { id: userId } });
+    // Delete the user by MongoDB _id
+    const deletedUser = await User.findByIdAndDelete(userId);
+    return deletedUser;
   }
 }
 
